@@ -491,3 +491,5 @@ clex/eval/shalem/segal_2015.tsv
 clex/eval/terminator/segal_2015.tsv
 clex/eval/promoter/filtered_test_data_with_MAUDE_expression.txt
 clex/eval/scramble/brooks_sample_correlations.csv
+dist/*
+yorzoi.egg-info/*
