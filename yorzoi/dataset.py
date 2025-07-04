@@ -5,8 +5,6 @@ import numpy as np
 from yorzoi.constants import nucleotide2onehot
 from yorzoi.utils import _borzoi_transform
 import matplotlib.pyplot as plt
-from itertools import islice
-import math
 
 
 class GenomicDataset(Dataset):
