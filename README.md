@@ -38,6 +38,12 @@ with torch.autocast(device_type="cuda"):
     predictions = model(sequences)
 ```
 
+# Roadmap
+
+- [ ] Publish training data
+- [ ] Publish evaluation code and data
+- [ ] Publish data processing tools and raw data
+
 # Contact
 
 In case of any issues, feedback or thoughts, here is my email: mail@timonschneider.de
