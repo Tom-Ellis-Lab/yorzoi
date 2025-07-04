@@ -13,6 +13,31 @@ This project was developed with Python version 3.9.19. In case you struggle with
 
 ## Quick Start: Make a prediction
 
+Find a more extensive demo in [demo.ipynb](demo.ipynb)
+
+```
+import random
+import torch
+from yorzoi.dataset import GenomicDataset
+from yorzoi.model.borzoi import Borzoi
+
+model = Borzoi.from_pretrained("tom-ellis-lab/yorzoi")
+model.to("cuda:0")
+model.eval()
+
+def random_dna_sequence(length):
+    return ''.join(random.choices('ACGT', k=length))
+
+sequences = torch.stack([torch.tensor(GenomicDataset.one_hot_encode((random_dna_sequence(4992))), dtype=torch.float32) for _ in range(5)])
+
+print(f"\nPredicting RNA-seq coverage for {sequences.shape[0]} sequences\n")
+
+sequences = sequences.to("cuda:0")
+
+with torch.autocast(device_type="cuda"):
+    predictions = model(sequences)
+```
+
 # Contact
 
 In case of any issues, feedback or thoughts, here is my email: mail@timonschneider.de
