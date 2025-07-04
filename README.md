@@ -6,8 +6,10 @@ yorzoi is a deep neural network that predicts RNA-seq coverage from DNA sequence
 
 1. You will need an NVIDIA GPU to run Clex.
 2. Create a new virtual environment (e.g.: `python -m venv .venv`) and activate it (e.g. `source .venv/bin/activate`)
-3. Clex requires FlashAttention to be installed: https://github.com/Dao-AILab/flash-attention. We recommend downloading a pre-built wheel suitable for your GPU.
-4. `pip install yorzoi`
+3. `pip install yorzoi`
+4. Clex requires [FlashAttention2](https://github.com/Dao-AILab/flash-attention) to run (check below if you haven't installed FA before).
+
+This project was developed with Python version 3.9.19. In case you struggle with the installation - let me know (email below).
 
 ## Quick Start: Make a prediction
 
