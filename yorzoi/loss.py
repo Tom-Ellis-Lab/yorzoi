@@ -1,6 +1,7 @@
 import torch
 from torch.nn import functional as F
 
+
 def poisson_multinomial(
     y_pred: torch.Tensor,  # Shape: bs x tracks x seq
     y_true: torch.Tensor,  # Shape: bs x tracks x seq
