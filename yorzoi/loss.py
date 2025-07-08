@@ -12,6 +12,7 @@ def poisson_multinomial(
     resolution: int = 10,
 ):
     """Poisson decomposition with multinomial specificity term.
+
     Args:
         total_weight (float): Weight of the Poisson total term.
         epsilon (float): Added small value to avoid log(0).
