@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from yorzoi.loss import poisson_multinomial
 from yorzoi.model.baseline import DNAConvNet
 from yorzoi.config import BorzoiConfig, TrainConfig
+from yorzoi.train_utils.data import create_datasets, create_dataloaders
 
 
 # Helper ---------------------------------------------------------------------
@@ -398,7 +399,7 @@ def test_model(
 def main(cfg_path: str, device: str, model_name: str, run_id: str):
     import os
 
-    cfg = Config.read_from_json(cfg_path)
+    cfg = TrainConfig.read_from_json(cfg_path)
 
     torch.manual_seed(seed=cfg.seed)
 
@@ -418,36 +419,11 @@ def main(cfg_path: str, device: str, model_name: str, run_id: str):
 
     wandb.init(project="clex", config=cfg.__dict__, name=run_id)
 
-    import pandas as pd
-
     print("Loading data...")
 
-    samples = pd.read_pickle(cfg.path_to_samples)
-    if cfg.subset_data:
-        for col in cfg.subset_data:
-            samples = samples[samples[col].isin(cfg.subset_data[col])]
+    train_dataset, val_dataset, test_dataset = create_datasets(cfg)
 
-    print("\tDone.")
-
-    train_samples = samples[samples["fold"] == "train"]
-    val_samples = samples[samples["fold"] == "val"]
-    test_samples = samples[samples["fold"] == "test"]
-
-    print("Creating train-val-test datasets...")
-    train_dataset = GenomicDataset(
-        train_samples,
-        resolution=cfg.resolution,
-        split_name="train",
-        rc_aug=cfg.augmentation["rc_aug"],
-        noise_tracks=cfg.augmentation["noise"],
-    )
-    val_dataset = GenomicDataset(
-        val_samples, resolution=cfg.resolution, split_name="val"
-    )
-    test_dataset = GenomicDataset(
-        test_samples, resolution=cfg.resolution, split_name="test"
-    )
-    print("\tDone.")
+    print("\tCreated datasets.")
 
     # Print mean and std dev of train, val and test datasets
     print("== Approx. Dataset Statistics ==")
@@ -456,49 +432,11 @@ def main(cfg_path: str, device: str, model_name: str, run_id: str):
     print("\tValidation dataset mean:", val_dataset.mean_track_values)
     print("\tValidation dataset std dev:", val_dataset.std_track_values)
 
-    print("\n")
-
-    print(
-        "Train dataset length:",
-        len(train_dataset),
-        f"({100 * (len(train_dataset) / len(samples)):.2f}%)",
-        "| Validation dataset length:",
-        len(val_dataset),
-        f"({100 * (len(test_dataset) / len(samples)):.2f}%)",
-        "| Test dataset length:",
-        len(test_dataset),
-        f"({100 * (len(test_dataset) / len(samples)):.2f}%)",
+    train_loader, val_loader, test_loader = create_dataloaders(
+        cfg, train_dataset, val_dataset, test_dataset
     )
 
-    # Create the dataloader
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=cfg.batch_size,
-        shuffle=cfg.shuffle_train_loader,
-        collate_fn=custom_collate_factory(resolution=cfg.resolution),
-        num_workers=8,
-        pin_memory=True,
-        prefetch_factor=4,
-        persistent_workers=True,
-    )  # TODO: set shuffle back to true later when you have confirmed that the model is training correctly
-    # or find a different way to plot the predictions for a fixed set of samples; since it's SGD,
-    # the batches should be shuffled to prevent being stuck with a particularly unrepresentative
-    # set of batches.
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=cfg.batch_size,
-        shuffle=cfg.shuffle_val_loader,
-        collate_fn=custom_collate_factory(resolution=cfg.resolution),
-        num_workers=8,
-        pin_memory=True,
-        prefetch_factor=4,
-    )  # Keep shuffle as False to check the progression of the model during training
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=cfg.batch_size,
-        shuffle=cfg.shuffle_test_loader,
-        collate_fn=custom_collate_factory(resolution=cfg.resolution),
-    )
+    print("\tCreated dataloaders.")
 
     # Initialize the model
     model = None
