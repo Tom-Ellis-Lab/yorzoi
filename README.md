@@ -3,6 +3,8 @@
 yorzoi is a deep neural network that predicts RNA-seq coverage from DNA sequence in Yeast (S. Cerevisiae). It is available via PyPI and Huggingface (see installation).
 
 ![Model summary](summary.png)
+## Usage (no coding or installation required)
+Yorzoi is available at [yorzoi.eu](https://www.yorzoi.eu). If you want more control over the model you need to install it as a PyPI package (see [Installation](##installation)).
 
 ## Installation
 
