@@ -28,6 +28,7 @@ from yorzoi.model.baseline import DNAConvNet
 from yorzoi.config import TrainConfig
 from yorzoi.train_utils.data import create_datasets, create_dataloaders
 from yorzoi.train_utils.model_factory import get_model
+from yorzoi.train_utils.train import pick_optimizer, pick_scheduler
 
 
 # Helper ---------------------------------------------------------------------
@@ -452,31 +453,9 @@ def main(cfg_path: str, device: str, run_id: str):
             reduction=cfg.loss["reduction"],
         )
 
-    optimizer = None
-    if cfg.optimizer["method"] == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer["lr"])
-        print("Using Adam.")
-    elif cfg.optimizer["method"] == "adamw":
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=cfg.optimizer["lr"],
-            weight_decay=cfg.optimizer["weight_decay"],
-        )
-        print("Using AdamW.")
-    else:
-        raise ValueError("Unknown optimizer!")
+    optimizer = pick_optimizer(cfg, model)
 
-    scheduler = None
-    if cfg.scheduler == "steplr":
-        scheduler = StepLR(optimizer, step_size=18, gamma=0.1)
-    elif cfg.scheduler == "cosineannealinglr":
-        scheduler = CosineAnnealingLR(optimizer, T_max=50, eta_min=1e-6)
-    elif cfg.scheduler == "cosineannealingwr":
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-    elif cfg.scheduler == "constant":
-        scheduler = ConstantLR(optimizer, factor=1, total_iters=1)
-    else:
-        raise ValueError("Unknown scheduler value")
+    scheduler = pick_scheduler(cfg, optimizer)
 
     wandb.watch(model, log="all", log_freq=100)
 
@@ -495,7 +474,9 @@ def main(cfg_path: str, device: str, run_id: str):
         device=device,
         patience=cfg.patience,
         finetune_epochs=cfg.finetune_epochs,
-        randomize_track_order=(cfg.randomize_track_order and model_name == "clex"),
+        randomize_track_order=(
+            cfg.randomize_track_order and cfg.model_name == "yorzoi"
+        ),
         freeze_backbone=True,
         finetune_lr_factor=0.1,
         run_config=cfg,  # TODO: refactor such that config is only passed once
