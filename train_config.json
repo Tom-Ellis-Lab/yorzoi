@@ -1,0 +1,103 @@
+{
+  "seed": 42,
+  "batch_size": 30,
+  "num_epochs": 250,
+  "patience": 50,
+  "finetune_epochs": 40,
+  "randomize_track_order": true,
+  "scheduler": "cosineannealingwr",
+  "optimizer": {
+    "method": "adamw",
+    "weight_decay": 0.0000001,
+    "lr": 0.00006
+  },
+  "path_to_samples": "/home/tds122/clex/data/samples_290625/samples_combined.pkl",
+  "fwd_track_only": false,
+  "subset_data": {
+    "chr_loss": [
+      "NC_001148.4",
+      "NC_001147.6",
+      "NC_001146.8",
+      "NC_001145.3",
+      "NC_001144.5",
+      "NC_001143.9",
+      "NC_001142.9",
+      "NC_001140.6",
+      "NC_001139.9",
+      "NC_001138.5",
+      "NC_001137.3",
+      "NC_001141.2",
+      "NC_001136.10",
+      "NC_001135.5",
+      "NC_001134.8",
+      "NC_001133.9",
+      "E145_NC_000007.14",
+      "759h10_NC_000004.12",
+      "802D1new_NC_000003.12",
+      "852e11_NC_000009.12",
+      "E533_NC_000007.14",
+      "950c12_NC_000011.10",
+      "E202_NC_000007.14",
+      "E1068_NC_000007.14",
+      "E481_NC_000007.14",
+      "926e5_NC_000017.11"
+    ]
+  },
+  "shuffle_train_loader": true,
+  "shuffle_val_loader": false,
+  "shuffle_test_loader": false,
+  "plot_batch_train": false,
+  "plot_batch_val": false,
+  "loss": {
+    "poisson_weight": 0.1,
+    "epsilon": 0.00001,
+    "reduction": "mean"
+  },
+  "borzoi_cfg": {
+    "dim": 512,
+    "resolution": 10,
+    "depth": 8,
+    "heads": 4,
+    "return_center_bins_only": true,
+    "attn_dim_key": 64,
+    "attn_dim_value": 192,
+    "dropout_rate": 0.2,
+    "attn_dropout": 0.05,
+    "pos_dropout": 0.01,
+    "enable_mouse_head": false,
+    "flashed": true,
+    "horizontal_conv0": {
+      "in_channels": 448,
+      "out_channels": 324
+    },
+    "upsampling_unet0": {
+      "in_channels": 324,
+      "out_channels": 324
+    },
+    "separable1": {
+      "conv1d": {
+        "out_channels": 324
+      },
+      "separ_conv": {
+        "in_channels": 512,
+        "out_channels": 512
+      }
+    },
+    "separable0": {
+      "in_channels": 324,
+      "out_channels": 324
+    },
+    "final_joined_convs": {
+      "in_channels": 324,
+      "out_channels": 162
+    },
+    "head": {
+      "in_channels": 162,
+      "out_channels": 162
+    }
+  },
+  "augmentation": {
+    "noise": false,
+    "rc_aug": true
+  }
+}
