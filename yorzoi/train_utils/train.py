@@ -3,7 +3,7 @@ import torch.nn as nn
 from yorzoi.config import TrainConfig
 
 
-def pick_optimizer(cfg: TrainConfig, model: nn.Module) -> torch.optim.Optimizer:
+def get_optimizer(cfg: TrainConfig, model: nn.Module) -> torch.optim.Optimizer:
     if cfg.optimizer["method"] == "adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer["lr"])
         print("Using Adam.")
@@ -20,7 +20,7 @@ def pick_optimizer(cfg: TrainConfig, model: nn.Module) -> torch.optim.Optimizer:
     return optimizer
 
 
-def pick_scheduler(
+def get_scheduler(
     cfg: TrainConfig, optimizer: torch.optim.Optimizer
 ) -> torch.optim.lr_scheduler._LRScheduler:
     from torch.optim.lr_scheduler import (
@@ -44,3 +44,19 @@ def pick_scheduler(
         )
 
     return scheduler
+
+
+def get_criterion(cfg: TrainConfig) -> nn.Module:
+    from yorzoi.loss import poisson_multinomial
+
+    def criterion(output, targets):
+        return poisson_multinomial(
+            output,
+            targets,
+            poisson_weight=cfg.loss["poisson_weight"],
+            epsilon=cfg.loss["epsilon"],
+            rescale=False,
+            reduction=cfg.loss["reduction"],
+        )
+
+    return criterion

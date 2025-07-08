@@ -28,7 +28,7 @@ from yorzoi.model.baseline import DNAConvNet
 from yorzoi.config import TrainConfig
 from yorzoi.train_utils.data import create_datasets, create_dataloaders
 from yorzoi.train_utils.model_factory import get_model
-from yorzoi.train_utils.train import pick_optimizer, pick_scheduler
+from yorzoi.train_utils.train import get_optimizer, get_scheduler, get_criterion
 
 
 # Helper ---------------------------------------------------------------------
@@ -442,24 +442,13 @@ def main(cfg_path: str, device: str, run_id: str):
 
     model = get_model(cfg)
 
-    # Define loss function and optimizer
-    def criterion(output, targets):
-        return poisson_multinomial(
-            output,
-            targets,
-            poisson_weight=cfg.loss["poisson_weight"],
-            epsilon=cfg.loss["epsilon"],
-            rescale=False,
-            reduction=cfg.loss["reduction"],
-        )
+    criterion = get_criterion(cfg)
 
-    optimizer = pick_optimizer(cfg, model)
+    optimizer = get_optimizer(cfg, model)
 
-    scheduler = pick_scheduler(cfg, optimizer)
+    scheduler = get_scheduler(cfg, optimizer)
 
     wandb.watch(model, log="all", log_freq=100)
-
-    # summary(model, input_size=(1, 4992, 4), device=device)
 
     # Train the model
     train_model(
