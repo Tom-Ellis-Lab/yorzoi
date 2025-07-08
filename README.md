@@ -40,9 +40,12 @@ with torch.autocast(device_type="cuda"):
     predictions = model(sequences)
 ```
 
+# Dataset
+
+You can find the preprocessed training data here: https://huggingface.co/datasets/tom-ellis-lab/yeast-RNA-seq. The raw data (e.g. fasta and bam/bed/bigwig files) is currently being prepared for distribution.
+
 # Roadmap
 
-- [ ] Publish training data
 - [ ] Publish evaluation code and data
 - [ ] Publish data processing tools and raw data
 
