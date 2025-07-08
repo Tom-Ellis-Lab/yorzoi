@@ -19,7 +19,6 @@ from torch.optim.lr_scheduler import (
 )
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from yorzoi.model.baseline import DNAConvNet
 from yorzoi.config import TrainConfig
 from yorzoi.train_utils.data import create_datasets, create_dataloaders
 from yorzoi.train_utils.model_factory import get_model
@@ -35,6 +34,7 @@ def train_model(
     criterion,
     optimizer,
     scheduler,
+    flashed: bool,
     num_epochs=10,
     device="cuda:0",
     patience: int = 10,
@@ -42,7 +42,6 @@ def train_model(
     randomize_track_order: bool = False,
     freeze_backbone: bool = True,
     finetune_lr_factor: float = 0.1,
-    run_config=None,
 ):
     os.makedirs(f"{run_path}/predictions")
 
@@ -79,7 +78,7 @@ def train_model(
             # Zero the gradients
             optimizer.zero_grad()
 
-            if run_config.borzoi_cfg["flashed"]:
+            if flashed:
                 with torch.autocast(device_type="cuda"):
                     outputs = model(sequences)
                     outputs = outputs.squeeze(
@@ -135,7 +134,7 @@ def train_model(
         val_poisson_loss = 0
         val_multinomial_loss = 0
         with torch.no_grad():
-            if run_config.borzoi_cfg["flashed"]:
+            if flashed:
                 with torch.autocast(device_type="cuda"):
                     for i, batch in enumerate(val_loader):
                         sequences, targets = batch[0], batch[1]
@@ -272,8 +271,6 @@ def train_model(
                 )
                 break
 
-    wandb.save(json.dumps(run_config.__dict__))
-
 
 def test_model(
     base_folder: str,
@@ -320,8 +317,8 @@ def main(cfg_path: str, device: str, run_id: str):
 
     torch.manual_seed(seed=cfg.seed)
 
+    # Create a run folder to save model checkpoints and evaluation results
     base_folder = f"runs/{run_id}"
-
     os.makedirs(base_folder)
 
     # Copy the config into the basefolder
@@ -376,6 +373,7 @@ def main(cfg_path: str, device: str, run_id: str):
         scheduler=scheduler,
         num_epochs=cfg.num_epochs,
         device=device,
+        flashed=cfg.flashed,
         patience=cfg.patience,
         finetune_epochs=cfg.finetune_epochs,
         randomize_track_order=(
@@ -383,8 +381,9 @@ def main(cfg_path: str, device: str, run_id: str):
         ),
         freeze_backbone=True,
         finetune_lr_factor=0.1,
-        run_config=cfg,  # TODO: refactor such that config is only passed once
     )
+
+    wandb.save(json.dumps(cfg.__dict__))
 
     print(f"Trained for {(time() - t0) / 60} min")
 
