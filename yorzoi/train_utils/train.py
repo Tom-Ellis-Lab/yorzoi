@@ -1,12 +1,6 @@
 import torch
 import torch.nn as nn
 from yorzoi.config import TrainConfig
-from torch.optim.lr_scheduler import (
-    StepLR,
-    CosineAnnealingLR,
-    CosineAnnealingWarmRestarts,
-    ConstantLR,
-)
 
 
 def pick_optimizer(cfg: TrainConfig, model: nn.Module) -> torch.optim.Optimizer:
@@ -29,6 +23,13 @@ def pick_optimizer(cfg: TrainConfig, model: nn.Module) -> torch.optim.Optimizer:
 def pick_scheduler(
     cfg: TrainConfig, optimizer: torch.optim.Optimizer
 ) -> torch.optim.lr_scheduler._LRScheduler:
+    from torch.optim.lr_scheduler import (
+        StepLR,
+        CosineAnnealingLR,
+        CosineAnnealingWarmRestarts,
+        ConstantLR,
+    )
+
     if cfg.scheduler == "steplr":
         scheduler = StepLR(optimizer, step_size=18, gamma=0.1)
     elif cfg.scheduler == "cosineannealinglr":
