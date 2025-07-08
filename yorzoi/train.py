@@ -391,7 +391,7 @@ def main(cfg_path: str, device: str, run_id: str):
     # Evaluate on the test set
     model.eval()
 
-    test_model(  # TODO uncomment when real training runs start again
+    test_model(
         base_folder=base_folder,
         test_loader=test_loader,
         model=model,
