@@ -7,7 +7,7 @@ yorzoi is a deep neural network that predicts RNA-seq coverage from DNA sequence
 Yorzoi is available at [yorzoi.eu](https://www.yorzoi.eu). If you want more control over the model you need to install it as a PyPI package (see [Installation](##installation)).
 
 ## HTTP API (no installation or GPU required)
-If you just want to get model predictions programmatically but don't need direct model access, you can use our API. Requests might take up to 10s. Here is an example request: 
+If you just want to get model predictions programmatically but don't need direct model access, you can use our API. (Cold start) Requests might take up to 10s. Here is an example request: 
 ```bash
 curl --request POST \
   --url https://tom-ellis-lab--yorzoi-app-fastapi-app.modal.run/generate \
