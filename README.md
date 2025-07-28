@@ -36,26 +36,28 @@ response = requests.post(url, json=payload, headers=headers)
 print("Status code:", response.status_code)
 print("Response body:", response.json())
 
-# The response JSON contains the predicted coverage values under the
-# ``predictions`` key. Each sequence returns a ``(162, 3000)`` array where
-# the first 81 tracks correspond to the forward strand and the remaining
-# 81 tracks correspond to the reverse strand. The mapping from track index
-# to experimental condition is provided in `track_annotation.json`.
+# The JSON object maps each input sequence to a ``(162, 3000)`` array of
+# predicted coverage values. For example, a request with ``{"sequences": ["ACGTGT"]}``
+# would yield ``{"ACGTGT": [[0, 1, 2, ...], [...], ...]}`` where the nested
+# arrays correspond to the different RNA‑seq tracks. The first 81 tracks are
+# the forward strand (+) and the remaining 81 tracks are the reverse strand (-).
+# Track names for both strands are provided in ``track_annotation.json``.
 
 import json
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Example: visualise the forward (+) and reverse (-) coverage of the first track
-predictions = np.array(response.json()["predictions"])
+result = response.json()
+predictions = np.array(result["ACGTGT"])  # key is the input sequence
 with open("track_annotation.json") as f:
     annotation = json.load(f)
 
 fwd_name = annotation["+"][0]
 rev_name = annotation["-"][0]
 
-plt.plot(predictions[0, 0], label=f"{fwd_name} (+)")
-plt.plot(predictions[0, 81], label=f"{rev_name} (-)")
+plt.plot(predictions[0], label=f"{fwd_name} (+)")
+plt.plot(predictions[81], label=f"{rev_name} (-)")
 plt.xlabel("Position [bp]")
 plt.ylabel("Predicted coverage")
 plt.legend()
