@@ -16,6 +16,26 @@ curl --request POST \
   "sequences": ["ACGTGT"]
 }'
 ```
+or the same in Python: 
+```bash
+pip install requests
+```
+```python
+import requests
+
+url = "https://tom-ellis-lab--yorzoi-app-fastapi-app.modal.run/generate"
+payload = {
+    "sequences": ["ACGTGT"]
+}
+headers = {
+    "Content-Type": "application/json"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+
+print("Status code:", response.status_code)
+print("Response body:", response.json())
+```
 
 ## Installation
 
