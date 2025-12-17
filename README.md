@@ -1,4 +1,6 @@
 # Yorzoi: RNA-seq coverage prediction from DNA sequence
+> [!NOTE]  
+> In case of any questions, reach out to mail@timonschneider.de - always happy to help!
 
 yorzoi is a deep neural network that predicts RNA-seq coverage from DNA sequence in Yeast (S. Cerevisiae). It is available via PyPI and Huggingface (see installation).
 
