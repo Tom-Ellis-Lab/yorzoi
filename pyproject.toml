@@ -1,3 +1,25 @@
+[project]
+name = "yorzoi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9,<3.10"
+dependencies = [
+    "packaging",
+    "ninja",
+    "einops>=0.5",
+    "matplotlib",
+    "pandas",
+    "torch>=2.1.0",
+    "wandb",
+    "transformers>=4.34.1",
+    "numpy>=1.14.2",
+]
+
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+include = ["yorzoi*"]
