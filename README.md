@@ -6,7 +6,7 @@ yorzoi is a deep neural network that predicts RNA-seq coverage from DNA sequence
 
 ![Model summary](summary.png)
 ## No-Code Usage (no coding or installation required)
-Yorzoi is available at [yorzoi.eu](https://www.yorzoi.eu). If you want more control over the model you need to install it as a PyPI package (see [Installation](##installation)).
+Yorzoi is available at [yorzoi.eu](https://www.yorzoi.eu). If you want more control over the model you need to install it as a PyPI package (see [Installation](#installation)).
 
 ## HTTP API (no installation or GPU required)
 If you just want to get model predictions programmatically but don't need direct model access, you can use our API. (Cold start) Requests might take up to 10s. Here is an example request: 
@@ -69,11 +69,22 @@ plt.show()
 ## Installation
 
 1. You will need an NVIDIA GPU to run _Yorzoi_.
-2. Create a new virtual environment (e.g.: `python -m venv .venv`) and activate it (e.g. `source .venv/bin/activate`)
-3. `pip install yorzoi`
-4. _Yorzoi_ requires [FlashAttention2](https://github.com/Dao-AILab/flash-attention) to run (check below if you haven't installed FA before).
+2. This project was developed with Python version 3.9.19.
+3. To work with a local checkout of this repository, run:
+```bash
+uv python install 3.9
+uv sync --python 3.9
+source .venv/bin/activate
+```
+4. To install the published package from PyPI instead, run:
+```bash
+uv venv --python 3.9
+source .venv/bin/activate
+uv pip install yorzoi
+```
+5. _Yorzoi_ requires [FlashAttention2](https://github.com/Dao-AILab/flash-attention) to run, so install that after the base environment is ready (check below if you haven't installed FA before).
 
-This project was developed with Python version 3.9.19. In case you struggle with the installation - let me know (email below).
+In case you struggle with the installation - let me know (email below).
 
 ## Quick Start: Make a prediction
 

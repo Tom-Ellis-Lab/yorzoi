@@ -1,3 +1,35 @@
+[project]
+name = "yorzoi"
+version = "0.1.0"
+description = "Machine learning model that predicts RNA-seq coverage from DNA"
+readme = "README.md"
+requires-python = ">=3.9,<3.10"
+authors = [
+    { name = "Timon Schneider", email = "mail@timonschneider.de" },
+]
+dependencies = [
+    "packaging",
+    "ninja",
+    "einops>=0.5",
+    "matplotlib",
+    "pandas",
+    "torch>=2.1.0",
+    "wandb",
+    "transformers>=4.34.1",
+    "numpy>=1.14.2",
+    "pre-commit>=4.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Tom-Ellis-Lab/yorzoi"
+
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = ["LICENSE.txt"]
+
+
+[tool.setuptools.packages.find]
+include = ["yorzoi*"]
