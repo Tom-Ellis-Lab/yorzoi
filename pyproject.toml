@@ -3,21 +3,25 @@ name = "yorzoi"
 version = "0.1.0"
 description = "Machine learning model that predicts RNA-seq coverage from DNA"
 readme = "README.md"
-requires-python = ">=3.9,<3.10"
+requires-python = ">=3.12"
 authors = [
     { name = "Timon Schneider", email = "mail@timonschneider.de" },
 ]
 dependencies = [
     "packaging",
-    "ninja",
     "einops>=0.5",
     "matplotlib",
     "pandas",
-    "torch>=2.1.0",
+    "torch>=2.5",
     "wandb",
     "transformers>=4.34.1",
-    "numpy>=1.14.2",
+    "numpy>=1.26",
     "pre-commit>=4.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
 ]
 
 [project.urls]
