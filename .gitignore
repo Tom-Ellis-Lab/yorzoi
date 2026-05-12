@@ -3,3 +3,5 @@ dist/*
 *__pycache__*
 *egg-info*
 build/lib/*
+tests/fixtures/attention_block.pt
+tests/fixtures/borzoi_forward.pt
