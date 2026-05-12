@@ -23,12 +23,12 @@
 # SOFTWARE.
 # =========================================================================
 
-import torch.nn as nn
-from torch import nn, einsum
-from einops import rearrange, reduce
-from einops.layers.torch import Rearrange
-import torch
 import math
+
+import torch
+import torch.nn.functional as F
+from einops import rearrange
+from torch import einsum, nn
 
 
 def get_positional_features_central_mask(positions, features, seq_len):
@@ -158,41 +158,154 @@ class Attention(nn.Module):
         return out
 
 
+class _RotaryEmbedding(nn.Module):
+    """NeoX-style partial rotary embedding.
+
+    Matches the layout of ``flash_attn.layers.rotary.RotaryEmbedding``: rotates
+    the first / second halves of the leading ``dim`` features of the last axis
+    (``interleaved=False``). The cos/sin tables are cached as non-persistent
+    buffers, so they don't appear in ``state_dict`` and don't conflict with
+    checkpoints saved by the old flash-attn implementation.
+    """
+
+    def __init__(self, dim: int, base: float = 10000.0):
+        super().__init__()
+        self.dim = dim
+        self.base = float(base)
+        inv_freq = 1.0 / (
+            self.base ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim)
+        )
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        self._seq_len_cached = 0
+        self._cos_cached: torch.Tensor | None = None
+        self._sin_cached: torch.Tensor | None = None
+
+    def _update_cache(self, seq_len: int, device: torch.device, dtype: torch.dtype) -> None:
+        if (
+            self._cos_cached is None
+            or seq_len > self._seq_len_cached
+            or self._cos_cached.device != device
+            or self._cos_cached.dtype != dtype
+        ):
+            self._seq_len_cached = seq_len
+            t = torch.arange(seq_len, device=device, dtype=torch.float32)
+            inv_freq = self.inv_freq.to(device=device, dtype=torch.float32)
+            freqs = torch.outer(t, inv_freq)
+            self._cos_cached = torch.cos(freqs).to(dtype)
+            self._sin_cached = torch.sin(freqs).to(dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply rotary to the first ``self.dim`` features of ``x``.
+
+        ``x`` has shape ``(batch, seq_len, num_heads, head_dim)``; only the
+        leading ``self.dim`` of ``head_dim`` is rotated, the rest is passed
+        through untouched.
+        """
+        seq_len = x.shape[1]
+        self._update_cache(seq_len, x.device, x.dtype)
+        cos = self._cos_cached[:seq_len].unsqueeze(-2)  # (seq_len, 1, dim/2)
+        sin = self._sin_cached[:seq_len].unsqueeze(-2)
+
+        rot, passthrough = x[..., : self.dim], x[..., self.dim :]
+        half = self.dim // 2
+        x1, x2 = rot[..., :half], rot[..., half:]
+        rotated = torch.cat([x1 * cos - x2 * sin, x1 * sin + x2 * cos], dim=-1)
+        return torch.cat([rotated, passthrough], dim=-1)
+
+
+class _MHAState(nn.Module):
+    """Plain container so submodules show up as ``mha.Wqkv`` / ``mha.out_proj``.
+
+    Mirrors the parameter naming of the old ``flash_attn.modules.mha.MHA`` wrapper
+    so existing checkpoints (e.g. ``tom-ellis-lab/yorzoi`` on HF) load without
+    any key renaming.
+    """
+
+
 class FlashAttention(nn.Module):
+    """Multi-head attention with rotary embeddings and grouped-query attention.
+
+    Uses PyTorch's built-in ``scaled_dot_product_attention`` (which dispatches
+    to the FlashAttention 2 kernel on supported GPUs) so the model no longer
+    depends on the external ``flash-attn`` package.
+
+    The submodule layout (``self.mha.Wqkv``, ``self.mha.out_proj``) is kept
+    identical to the previous flash-attn-based implementation so saved
+    checkpoints continue to load.
+    """
+
     def __init__(
         self,
-        dim=1536,
-        heads=8,
-        dropout=0.15,
-        pos_dropout=0.15,  # Not used
-        rotary_emb_base=20000.0,
-        rotary_emb_scale_base=None,
+        dim: int = 1536,
+        heads: int = 8,
+        dropout: float = 0.15,
+        pos_dropout: float = 0.15,  # unused, kept for backwards compatibility
+        rotary_emb_base: float = 20000.0,
+        rotary_emb_scale_base=None,  # unused, kept for backwards compatibility
+        rotary_emb_dim: int = 128,
     ):
         super().__init__()
+        del pos_dropout, rotary_emb_scale_base  # accepted for backwards compat only
 
-        from flash_attn.modules.mha import MHA
+        head_dim = dim // heads
+        if head_dim * heads != dim:
+            raise ValueError(f"dim ({dim}) must be divisible by heads ({heads})")
+        if rotary_emb_dim > head_dim:
+            raise ValueError(
+                f"rotary_emb_dim ({rotary_emb_dim}) must be <= head_dim ({head_dim})"
+            )
 
-        self.mha = MHA(
-            use_flash_attn=True,
-            embed_dim=dim,
-            num_heads=heads,
-            num_heads_kv=(heads // 2),
-            qkv_proj_bias=True,  # False,
-            out_proj_bias=True,
-            dropout=dropout,
-            softmax_scale=(dim / heads) ** -0.5,
-            causal=False,
-            rotary_emb_dim=128,
-            rotary_emb_base=rotary_emb_base,
-            rotary_emb_scale_base=rotary_emb_scale_base,
-            fused_bias_fc=False,
-        )
+        heads_kv = heads // 2
+        self.heads = heads
+        self.heads_kv = heads_kv
+        self.head_dim = head_dim
+        self.rotary_emb_dim = rotary_emb_dim
+        self.softmax_scale = head_dim**-0.5
+        self.dropout_p = dropout
+
+        qkv_out_features = (heads + 2 * heads_kv) * head_dim
+        self.mha = _MHAState()
+        self.mha.Wqkv = nn.Linear(dim, qkv_out_features, bias=True)
+        self.mha.out_proj = nn.Linear(heads * head_dim, dim, bias=True)
+        self.mha.rotary_emb = _RotaryEmbedding(rotary_emb_dim, base=rotary_emb_base)
 
         nn.init.kaiming_normal_(self.mha.Wqkv.weight, nonlinearity="relu")
         nn.init.zeros_(self.mha.out_proj.weight)
         nn.init.zeros_(self.mha.out_proj.bias)
         nn.init.ones_(self.mha.Wqkv.bias)
 
-    def forward(self, x):
-        out = self.mha(x)
-        return out
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch, seq_len, _ = x.shape
+        qkv = self.mha.Wqkv(x)
+
+        q_size = self.heads * self.head_dim
+        kv_size = self.heads_kv * self.head_dim
+        q = qkv[..., :q_size].reshape(batch, seq_len, self.heads, self.head_dim)
+        k = qkv[..., q_size : q_size + kv_size].reshape(
+            batch, seq_len, self.heads_kv, self.head_dim
+        )
+        v = qkv[..., q_size + kv_size :].reshape(
+            batch, seq_len, self.heads_kv, self.head_dim
+        )
+
+        # Rotary embedding only on Q and K (V is untouched, matching flash-attn).
+        q = self.mha.rotary_emb(q)
+        k = self.mha.rotary_emb(k)
+
+        # SDPA expects (batch, num_heads, seq_len, head_dim).
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
+
+        out = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            dropout_p=self.dropout_p if self.training else 0.0,
+            is_causal=False,
+            scale=self.softmax_scale,
+            enable_gqa=True,
+        )
+
+        out = out.transpose(1, 2).reshape(batch, seq_len, self.heads * self.head_dim)
+        return self.mha.out_proj(out)

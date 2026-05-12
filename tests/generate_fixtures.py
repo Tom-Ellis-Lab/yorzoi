@@ -55,12 +55,25 @@ def small_borzoi_config() -> BorzoiConfig:
     )
 
 
+def _randomize_attention_weights(block: FlashAttention) -> None:
+    """Replace the production zero-init on ``out_proj`` so the test is not trivial.
+
+    The default ``FlashAttention.__init__`` zeros ``out_proj.weight`` and
+    ``out_proj.bias`` (so the residual block starts as identity at training
+    time). With those zeros the output of the attention block is identically
+    zero regardless of input, which makes numerical-equivalence tests useless.
+    """
+    torch.nn.init.normal_(block.mha.out_proj.weight, std=0.02)
+    torch.nn.init.normal_(block.mha.out_proj.bias, std=0.02)
+
+
 def generate_attention_fixture() -> None:
     """FlashAttention block in isolation: same dim/heads/rotary as production."""
     torch.manual_seed(SEED)
     dim, heads, seq_len, batch = 512, 4, 32, 2
 
     block = FlashAttention(dim=dim, heads=heads, dropout=0.0, pos_dropout=0.0)
+    _randomize_attention_weights(block)
     block = block.to(DEVICE).half().eval()
 
     torch.manual_seed(SEED + 1)
@@ -82,10 +95,17 @@ def generate_attention_fixture() -> None:
 
 
 def generate_borzoi_fixture() -> None:
-    """Full Borzoi forward, small config, autocast fp16 to match real inference."""
+    """Full Borzoi forward, small config, autocast fp16 to match real inference.
+
+    State dict is downcast to fp16 to keep the fixture file under ~15 MB.
+    """
     torch.manual_seed(SEED)
     cfg = small_borzoi_config()
-    model = Borzoi(cfg).to(DEVICE).eval()
+    model = Borzoi(cfg)
+    for module in model.modules():
+        if isinstance(module, FlashAttention):
+            _randomize_attention_weights(module)
+    model = model.to(DEVICE).eval()
 
     seq_len = 4992
     torch.manual_seed(SEED + 2)
@@ -96,10 +116,17 @@ def generate_borzoi_fixture() -> None:
     with torch.no_grad(), torch.autocast(device_type="cuda"):
         y = model(x)
 
+    state_dict = {}
+    for k, v in model.state_dict().items():
+        v = v.detach().cpu()
+        if v.is_floating_point() and v.dtype == torch.float32:
+            v = v.to(torch.float16)
+        state_dict[k] = v
+
     torch.save(
         {
             "config_dict": cfg.to_dict(),
-            "state_dict": {k: v.detach().cpu() for k, v in model.state_dict().items()},
+            "state_dict": state_dict,
             "input": x.detach().cpu(),
             "output": y.detach().cpu().float(),
         },
