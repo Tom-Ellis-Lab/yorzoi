@@ -1405,7 +1405,7 @@ wheels = [
 
 [[package]]
 name = "yorzoi"
-version = "0.1.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "einops" },
@@ -1433,7 +1433,7 @@ requires-dist = [
     { name = "pandas" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "torch", specifier = ">=2.5" },
-    { name = "transformers", specifier = ">=4.34.1" },
+    { name = "transformers", specifier = ">=4.34.1,<5" },
     { name = "wandb" },
 ]
 
