@@ -1,4 +1,6 @@
 {
+  "model_name": "yorzoi",
+  "device": "cuda:0",
   "seed": 42,
   "batch_size": 30,
   "num_epochs": 250,
