@@ -116,7 +116,19 @@ with torch.autocast(device_type="cuda"):
 
 # Dataset
 
-You can find the preprocessed training data here: https://huggingface.co/datasets/tom-ellis-lab/yeast-RNA-seq. The raw data (e.g. fasta and bam/bed/bigwig files) is currently being prepared for distribution.
+Preprocessed training data is available on [Hugging Face](https://huggingface.co/datasets/tom-ellis-lab/yeast-RNA-seq).
+
+## Brooks nanopore data
+
+The Brooks source data is available in the Google Cloud Storage bucket [brooks-nanopore](https://console.cloud.google.com/storage/browser/brooks-nanopore?project=clex-415415):
+
+- `alignment/`: BED alignment files.
+- `annotations/`: GFF annotations.
+- `genomes/`: reference genomes and associated index and chromosome-size files.
+
+The individual bigWig coverage tracks used for training are not yet included in this bucket. Model output track names and ordering are provided in [track_annotation.json](track_annotation.json).
+
+Access requires Google authentication; anonymous access is unavailable. Authenticated users can list and download files. This bucket uses **Requester Pays**: you must supply your own Google Cloud project with billing enabled to cover access and download costs.
 
 # Roadmap
 
