@@ -130,6 +130,18 @@ The individual bigWig coverage tracks used for training are not yet included in 
 
 Access requires Google authentication; anonymous access is unavailable. Authenticated users can list and download files. This bucket uses **Requester Pays**: you must supply your own Google Cloud project with billing enabled to cover access and download costs.
 
+## Human YAC RNA-seq data
+
+The human YAC RNA-seq data is available in the [human_YAC_RNAseq folder of the yorzoi Google Cloud Storage bucket](https://console.cloud.google.com/storage/browser/yorzoi/human_YAC_RNAseq):
+
+- `Alignments/`: BAM alignments, indexes, and strand-specific bigWig coverage tracks.
+- `genome/`: human, yeast, and concatenated reference genomes, with indexes and annotations.
+- `Fastqc/`: quality-control reports before and after trimming.
+
+Dataset summaries and a file manifest are also included. Raw Illumina reads are not yet included in this bucket.
+
+Access requires Google authentication; anonymous access is unavailable. Authenticated users can list and download files. This bucket uses **Requester Pays**: you must supply your own Google Cloud project with billing enabled to cover access and download costs.
+
 # Roadmap
 
 - [ ] Publish evaluation code and data
