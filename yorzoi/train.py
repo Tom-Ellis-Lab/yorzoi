@@ -15,95 +15,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import (
-    StepLR,
     CosineAnnealingLR,
-    ConstantLR,
-    CosineAnnealingWarmRestarts,
 )
-from yorzoi.dataset import GenomicDataset, custom_collate_factory
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from yorzoi.loss import poisson_multinomial
-from yorzoi.model.baseline import DNAConvNet
-from yorzoi.config import BorzoiConfig, TrainConfig
+from yorzoi.config import TrainConfig
 from yorzoi.train_utils.data import create_datasets, create_dataloaders
-
-
-# Helper ---------------------------------------------------------------------
-
-
-def _randomise_tracks(outputs: torch.Tensor, targets: torch.Tensor):
-    """Apply the **same** random permutation to outputs & targets.
-
-    The permutation keeps the upper and lower halves separate to avoid mixing
-    5'->3' with 3'->5' tracks.
-
-    Args:
-        outputs: (B, C, L) tensor predicted by the model.
-        targets: (B, C, L) tensor of ground-truth tracks.
-
-    Returns:
-        Tuple[Tensor, Tensor] with the permuted outputs & targets.
-    """
-
-    # We only permute if there is a genuine channel dimension to shuffle.
-    if outputs.dim() != 3:
-        return outputs, targets
-
-    n_tracks = outputs.size(1)
-    if n_tracks < 2:
-        return outputs, targets
-
-    assert n_tracks % 2 == 0, f"Expected an even number of tracks, got {n_tracks}."
-
-    half = n_tracks // 2
-    device = outputs.device
-    perm_upper = torch.randperm(half, device=device)
-    perm_lower = torch.randperm(half, device=device) + half
-    perm = torch.cat((perm_upper, perm_lower))
-
-    outputs = outputs[:, perm, :]
-    targets = targets[:, perm, :]
-    return outputs, targets
-
-
-# ---------------------------------------------------------------------------
-# Freeze logic for fine-tuning
-# ---------------------------------------------------------------------------
-
-
-def _freeze_backbone(model: nn.Module):
-    """Freeze all layers except the prediction head(s).
-
-    Works for the Borzoi model wrapped as ``nn.Sequential(TargetLengthCrop, Borzoi)``
-    and for the simple ``DNAConvNet`` baseline.
-    """
-
-    # blanket-freeze
-    for p in model.parameters():
-        p.requires_grad = False
-
-    heads = []
-
-    # Wrapped Borzoi
-    if isinstance(model, nn.Sequential) and len(model) == 2:
-        borzoi = model[1]
-        if hasattr(borzoi, "human_head"):
-            heads.append(borzoi.human_head)
-        if getattr(borzoi, "enable_mouse_head", False):
-            heads.append(borzoi.mouse_head)
-
-    # Baseline network
-    if isinstance(model, DNAConvNet):
-        heads.append(model.dense)
-
-    # Re-enable gradients for the heads
-    for head in heads:
-        for p in head.parameters():
-            p.requires_grad = True
-
-
-# Training loop --------------------------------------------------------------
+from yorzoi.train_utils.model_factory import get_model
+from yorzoi.train_utils.train import get_optimizer, get_scheduler, get_criterion
+from yorzoi.train_utils.finetuning import _freeze_backbone, _randomise_tracks
 
 
 def train_model(
@@ -114,6 +34,7 @@ def train_model(
     criterion,
     optimizer,
     scheduler,
+    flashed: bool,
     num_epochs=10,
     device="cuda:0",
     patience: int = 10,
@@ -121,7 +42,6 @@ def train_model(
     randomize_track_order: bool = False,
     freeze_backbone: bool = True,
     finetune_lr_factor: float = 0.1,
-    run_config=None,
 ):
     os.makedirs(f"{run_path}/predictions")
 
@@ -158,11 +78,7 @@ def train_model(
             # Zero the gradients
             optimizer.zero_grad()
 
-            # Forward pass
-            if epoch == 0 and i == 0:
-                visualize_input(sequences)
-
-            if run_config.borzoi_cfg["flashed"]:
+            if flashed:
                 with torch.autocast(device_type="cuda"):
                     outputs = model(sequences)
                     outputs = outputs.squeeze(
@@ -218,7 +134,7 @@ def train_model(
         val_poisson_loss = 0
         val_multinomial_loss = 0
         with torch.no_grad():
-            if run_config.borzoi_cfg["flashed"]:
+            if flashed:
                 with torch.autocast(device_type="cuda"):
                     for i, batch in enumerate(val_loader):
                         sequences, targets = batch[0], batch[1]
@@ -355,8 +271,6 @@ def train_model(
                 )
                 break
 
-    wandb.save(json.dumps(run_config.__dict__))
-
 
 def test_model(
     base_folder: str,
@@ -396,15 +310,15 @@ def test_model(
         f.write(json.dumps({"test_loss": test_loss}))
 
 
-def main(cfg_path: str, device: str, model_name: str, run_id: str):
+def main(cfg_path: str, device: str, run_id: str):
     import os
 
     cfg = TrainConfig.read_from_json(cfg_path)
 
     torch.manual_seed(seed=cfg.seed)
 
+    # Create a run folder to save model checkpoints and evaluation results
     base_folder = f"runs/{run_id}"
-
     os.makedirs(base_folder)
 
     # Copy the config into the basefolder
@@ -438,84 +352,15 @@ def main(cfg_path: str, device: str, model_name: str, run_id: str):
 
     print("\tCreated dataloaders.")
 
-    # Initialize the model
-    model = None
-    if model_name == "baseline":
-        model = DNAConvNet()
-    if model_name == "clex":
-        from yorzoi.model.borzoi import Borzoi
-        from yorzoi.model.utils import TargetLengthCrop
+    model = get_model(cfg)
 
-        config = BorzoiConfig(
-            dim=cfg.borzoi_cfg["dim"],
-            depth=cfg.borzoi_cfg["depth"],
-            heads=cfg.borzoi_cfg["heads"],
-            resolution=cfg.borzoi_cfg["resolution"],
-            return_center_bins_only=cfg.borzoi_cfg["return_center_bins_only"],
-            attn_dim_key=cfg.borzoi_cfg["attn_dim_key"],
-            attn_dim_value=cfg.borzoi_cfg["attn_dim_value"],
-            dropout_rate=cfg.borzoi_cfg["dropout_rate"],
-            attn_dropout=cfg.borzoi_cfg["attn_dropout"],
-            pos_dropout=cfg.borzoi_cfg["pos_dropout"],
-            enable_mouse_head=cfg.borzoi_cfg["enable_mouse_head"],
-            flashed=cfg.borzoi_cfg["flashed"],
-            separable0=cfg.borzoi_cfg["separable0"],
-            separable1=cfg.borzoi_cfg["separable1"],
-            head=cfg.borzoi_cfg["head"],
-            final_joined_convs=cfg.borzoi_cfg["final_joined_convs"],
-            upsampling_unet0=cfg.borzoi_cfg["upsampling_unet0"],
-            horizontal_conv0=cfg.borzoi_cfg["horizontal_conv0"],
-        )
+    criterion = get_criterion(cfg)
 
-        model = Borzoi(config)
+    optimizer = get_optimizer(cfg, model)
 
-        if cfg.checkpoint_path:
-            model.load_state_dict(torch.load(cfg.checkpoint_path, map_location="cpu"))
-
-        model.to(device)
-    else:
-        raise ValueError("Unknown model! Valid options are 'DNAConvNet' and 'clex'")
-
-    # Define loss function and optimizer
-    def criterion(output, targets):
-        return poisson_multinomial(
-            output,
-            targets,
-            poisson_weight=cfg.loss["poisson_weight"],
-            epsilon=cfg.loss["epsilon"],
-            rescale=False,
-            reduction=cfg.loss["reduction"],
-        )
-
-    optimizer = None
-    if cfg.optimizer["method"] == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer["lr"])
-        print("Using Adam.")
-    elif cfg.optimizer["method"] == "adamw":
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=cfg.optimizer["lr"],
-            weight_decay=cfg.optimizer["weight_decay"],
-        )
-        print("Using AdamW.")
-    else:
-        raise ValueError("Unknown optimizer!")
-
-    scheduler = None
-    if cfg.scheduler == "steplr":
-        scheduler = StepLR(optimizer, step_size=18, gamma=0.1)
-    elif cfg.scheduler == "cosineannealinglr":
-        scheduler = CosineAnnealingLR(optimizer, T_max=50, eta_min=1e-6)
-    elif cfg.scheduler == "cosineannealingwr":
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-    elif cfg.scheduler == "constant":
-        scheduler = ConstantLR(optimizer, factor=1, total_iters=1)
-    else:
-        raise ValueError("Unknown scheduler value")
+    scheduler = get_scheduler(cfg, optimizer)
 
     wandb.watch(model, log="all", log_freq=100)
-
-    # summary(model, input_size=(1, 4992, 4), device=device)
 
     # Train the model
     train_model(
@@ -528,20 +373,24 @@ def main(cfg_path: str, device: str, model_name: str, run_id: str):
         scheduler=scheduler,
         num_epochs=cfg.num_epochs,
         device=device,
+        flashed=cfg.flashed,
         patience=cfg.patience,
         finetune_epochs=cfg.finetune_epochs,
-        randomize_track_order=(cfg.randomize_track_order and model_name == "clex"),
+        randomize_track_order=(
+            cfg.randomize_track_order and cfg.model_name == "yorzoi"
+        ),
         freeze_backbone=True,
         finetune_lr_factor=0.1,
-        run_config=cfg,  # TODO: refactor such that config is only passed once
     )
+
+    wandb.save(json.dumps(cfg.__dict__))
 
     print(f"Trained for {(time() - t0) / 60} min")
 
     # Evaluate on the test set
     model.eval()
 
-    test_model(  # TODO uncomment when real training runs start again
+    test_model(
         base_folder=base_folder,
         test_loader=test_loader,
         model=model,
