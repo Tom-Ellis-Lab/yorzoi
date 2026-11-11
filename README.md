@@ -50,8 +50,11 @@ print("Status code:", response.status_code)
 response.raise_for_status()
 
 result = response.json()
+del response
+
 prediction = result["predictions"][0]
 values = np.asarray(prediction["values"], dtype=np.float32)
+
 
 # Coordinates are relative to the submitted sequence.
 edges = (
@@ -67,6 +70,8 @@ print("Warnings:", prediction["warnings"])
 plt.figure(figsize=(10, 4))
 for row, track in zip(values, result["tracks"]):
     plt.stairs(row, edges, label=track["id"])
+
+del result
 
 plt.xlabel("Position in input sequence [bp]")
 plt.ylabel("Predicted coverage")
