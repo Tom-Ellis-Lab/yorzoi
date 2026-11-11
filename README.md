@@ -36,7 +36,6 @@ headers = {
 response = requests.post(url, json=payload, headers=headers)
 
 print("Status code:", response.status_code)
-print("Response body:", response.json())
 
 # The JSON object maps each input sequence to a ``(162, 3000)`` array of
 # predicted coverage values. For example, a request with ``{"sequences": ["ACGTGT"]}``
