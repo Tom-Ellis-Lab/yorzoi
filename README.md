@@ -32,13 +32,16 @@ url = (
     "/v1/models/yorzoi/predict"
 )
 
-sequence = "ACGT" * 1248  # Example only; replace with your DNA sequence.
+sequence = "ACGT" * 1248  # Example only; REPLACE with your DNA sequence.
+
+FWD_TRACK_IDX = 17 # REPLACE with the track you want
+REV_TRACK_IDX = FWD_TRACK_IDX + 81 # offset by 81 finds you the matching reverse track
 
 response = requests.post(
     url,
     json={
         "sequences": [{"id": "example", "seq": sequence}],
-        "tracks": [0, 81],  # First dataset: forward (+) and reverse (-).
+        "tracks": [FWD_TRACK_IDX, REV_TRACK_IDX],  # First dataset: forward (+) and reverse (-). You can request 1 to 162 of the total available tracks.
         "window": "auto",
     },
     timeout=180,
