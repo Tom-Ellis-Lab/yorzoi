@@ -20,51 +20,55 @@ curl --request POST \
 ```
 or the same in Python: 
 ```bash
-pip install requests
+uv add requests numpy matplotlib
 ```
 ```python
 import requests
-
-url = "https://tom-ellis-lab--yorzoi-app-fastapi-app.modal.run/generate"
-payload = {
-    "sequences": ["ACGTGT"]
-}
-headers = {
-    "Content-Type": "application/json"
-}
-
-response = requests.post(url, json=payload, headers=headers)
-
-print("Status code:", response.status_code)
-
-# The JSON object maps each input sequence to a ``(162, 3000)`` array of
-# predicted coverage values. For example, a request with ``{"sequences": ["ACGTGT"]}``
-# would yield ``{"ACGTGT": [[0, 1, 2, ...], [...], ...]}`` where the nested
-# arrays correspond to the different RNA‑seq tracks. The first 81 tracks are
-# the forward strand (+) and the remaining 81 tracks are the reverse strand (-).
-# Track names for both strands are provided in ``track_annotation.json``.
-
-import json
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Example: visualise the forward (+) and reverse (-) coverage of the first track
+url = (
+    "https://tom-ellis-lab--yorzoi-api-yorzoiservice-web.modal.run"
+    "/v1/models/yorzoi/predict"
+)
+
+sequence = "ACGT" * 1248  # Example only; replace with your DNA sequence.
+
+response = requests.post(
+    url,
+    json={
+        "sequences": [{"id": "example", "seq": sequence}],
+        "tracks": [0, 81],  # First dataset: forward (+) and reverse (-).
+        "window": "auto",
+    },
+    timeout=180,
+)
+print("Status code:", response.status_code)
+response.raise_for_status()
+
 result = response.json()
-predictions = np.array(result["ACGTGT"])  # key is the input sequence
+prediction = result["predictions"][0]
+values = np.asarray(prediction["values"], dtype=np.float32)
 
-del result, response # removes response and result to keep memory low
+# Coordinates are relative to the submitted sequence.
+edges = (
+    prediction["bin_start_bp"]
+    + np.arange(values.shape[1] + 1) * prediction["bin_size_bp"]
+)
+# A full-window result can end with a partial bin.
+edges[-1] = min(edges[-1], prediction["length"])
 
-with open("track_annotation.json") as f:
-    annotation = json.load(f)
+print("Shape:", values.shape)
+print("Warnings:", prediction["warnings"])
 
-fwd_name = annotation["+"][0]
-rev_name = annotation["-"][0]
+plt.figure(figsize=(10, 4))
+for row, track in zip(values, result["tracks"]):
+    plt.stairs(row, edges, label=track["id"])
 
-plt.plot(predictions[0], label=f"{fwd_name} (+)")
-plt.plot(predictions[81], label=f"{rev_name} (-)")
-plt.xlabel("Position [bp]")
+plt.xlabel("Position in input sequence [bp]")
 plt.ylabel("Predicted coverage")
 plt.legend()
+plt.tight_layout()
 plt.show()
 ```
 
