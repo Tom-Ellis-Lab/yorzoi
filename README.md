@@ -52,6 +52,9 @@ import numpy as np
 # Example: visualise the forward (+) and reverse (-) coverage of the first track
 result = response.json()
 predictions = np.array(result["ACGTGT"])  # key is the input sequence
+
+del result, response # removes response and result to keep memory low
+
 with open("track_annotation.json") as f:
     annotation = json.load(f)
 
