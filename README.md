@@ -11,12 +11,19 @@ Yorzoi is available at [yorzoi.eu](https://www.yorzoi.eu). If you want more cont
 ## HTTP API (no installation or GPU required)
 If you just want to get model predictions programmatically but don't need direct model access, you can use our API ([open-source implementation](https://github.com/tdsone/yorzoi-app)). (Cold start) Requests might take up to 10s. Here is an example request: 
 ```bash
-curl --request POST \
-  --url https://tom-ellis-lab--yorzoi-app-fastapi-app.modal.run/generate \
+curl --fail-with-body --max-time 180 --request POST \
+  --url https://tom-ellis-lab--yorzoi-api-yorzoiservice-web.modal.run/v1/models/yorzoi/predict \
   --header 'Content-Type: application/json' \
   --data '{
-  "sequences": ["ACGTGT"]
-}'
+    "sequences": [
+      {
+        "id": "example",
+        "seq": "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT"
+      }
+    ],
+    "tracks": [0, 81],
+    "window": "auto"
+  }'
 ```
 or the same in Python: 
 ```bash
